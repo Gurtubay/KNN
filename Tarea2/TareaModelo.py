@@ -3,7 +3,8 @@ import pandas as pd
 import math
 import matplotlib.pyplot as plt 
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix, recall_score, f1_score
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import accuracy_score
@@ -78,6 +79,17 @@ def best_k_value(list):
     
     return best_k
 
+# Definimos una función para realizar la validación cruzada en función de k
+def cross_val_knn(k, X_data, y_data):
+    knn = KNeighborsClassifier(n_neighbors=k)
+    scores = cross_val_score(knn, X_data, y_data, cv=10, scoring='accuracy') # 10-fold cross-validation
+    return scores.mean()
+
+def knn_func1(train_data,label_data,test_data,k) : 
+    knn = KNeighborsClassifier(n_neighbors=k)
+    knn.fit(train_data,label_data)
+    pred_label = knn.predict(test_data)
+    return pred_label
 
 data = pd.read_csv("Dataset.csv") #Se lee el conjunto de datos "Dataset.csv" usando pandas
 
@@ -98,21 +110,64 @@ scaler = MinMaxScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.fit_transform(X_test)
 
+
+X_temp, X_val, y_temp, y_val = train_test_split(X_train, y_train, test_size=0.33, random_state=42)
+
 n = len(df) #n es el numero de registros
 k_max = math.sqrt(n)#Se define el valor maximo de k
 
 normalAcu = [] #Se inicializa una lista para guardar la precision de los entrenamientos con diferentes k
 k_value = range(1,math.ceil(k_max))#Se inicializan los posibles valores de k que van desde 1 hasta k_max
 
+# Probamos diferentes valores de k
+cross_val_scores = []
+
+for i in k_value:
+    cross_val_scores.append(cross_val_knn(i, X_train, y_train))
+
+# Graficamos la precisión promedio de validación cruzada en función de k
+plt.figure(figsize=(14, 7))
+plt.plot(k_value, cross_val_scores, marker='o', linestyle='-')
+plt.title('Precisión Promedio de Validación Cruzada vs. Valor de k')
+plt.xlabel('Valor de k')
+plt.ylabel('Precisión Promedio')
+plt.grid(True)
+plt.show()
+
+# Obtenemos el mejor k basado en la validación cruzada
+best_k_cross_val = k_value[np.argmax(cross_val_scores)]
+best_k_cross_val, max(cross_val_scores)
+
 #Se realiza una búsqueda para encontrar el mejor valor de k probando diferentes valores y almacenando sus precisines
 for i in k_value:
-    y_pred1 = knn_func(X_train,y_train,X_test,i) #Esto ejectura el modelo de knn con lso diferentes valores de k
+    #y_pred1 = knn_func(X_train,y_train,X_test,i) #Esto ejectura el modelo de knn con lso diferentes valores de k
+    y_pred1 = knn_func(X_train,y_train,X_test,i)
     accur = accuracy_score(y_test, y_pred1)#Esto evalua la precision
     normalAcu.append(accur)#Aqui se guarda la precision
 
+# Graficando la precisión en función del valor de k
+plt.figure(figsize=(12, 6))
+plt.plot(k_value, normalAcu, marker='o', linestyle='-')
+plt.title('Precisión vs. Valor de k')
+plt.xlabel('Valor de k')
+plt.ylabel('Precisión')
+plt.grid(True)
+plt.show()
+
+# Graficar los errores de entrenamiento y validación en función de k
+plt.figure(figsize=(14, 7))
+plt.plot(k_value, train_errors, marker='o', label='Entrenamiento', linestyle='-')
+plt.plot(k_value, validation_errors, marker='x', label='Validación', linestyle='-')
+plt.title('Errores de Entrenamiento y Validación vs. Valor de k')
+plt.xlabel('Valor de k')
+plt.ylabel('Error')
+plt.legend()
+plt.grid(True)
+plt.show()
+
 best_k=best_k_value(normalAcu)#Aqui llama a la funcion que regresa el indice del mejor valor de k en la lista normalAcu
 
-y_pred2 = knn_func(X_train,y_train,X_test,best_k+1) #Aqui se vuelve a correr el modelo de knn con el valor mas adecuado de k
+y_pred2 = knn_func1(X_train,y_train,X_test,best_k+1) #Aqui se vuelve a correr el modelo de knn con el valor mas adecuado de k
 acu=accuracy_score(y_test,y_pred2)#Se obtiene la precision del modelo con el mejor valor de k
 
 matriz_conf, rec_score, f1_sc = calcular_metricas(y_test, y_pred2)#Se llama a la funcion que obtiene las metricas faltantes
